@@ -51,51 +51,54 @@ def print_profiler(profiler):
         pass
 
 
-# noinspection PyTypeChecker,DuplicatedCode
+# noinspection PyTypeChecker
 def random_matrix(num_rows=100,
                   num_cols=3,
-                  len_values=3):
+                  len_values=3,
+                  with_header=True,
+                  value_type=str):
 
     from string import ascii_lowercase
     from random import choices
     from random import uniform
 
     # region {closure functions}
-    def header_name(ci):
-        cs = ''
-        while ci > 0:
-            ci_2 = (ci - 1) % 26
-            cs   = chr(ci_2 + 97) + cs
-            ci   = (ci - ci_2) // 26
+    def header_names():
+        h = []
+        for ci in range(1, num_cols + 1):
 
-        return 'col_{}'.format(cs)
+            cs = ''
+            while ci > 0:
+                ci_2 = (ci - 1) % 26
+                cs   = chr(ci_2 + 97) + cs
+                ci   = (ci - ci_2) // 26
+
+            h.append('col_{}'.format(cs))
+
+        return h
 
     def random_chars():
         return ''.join(choices(ascii_lowercase, k=len_values))
-
-    def string(i):
-        return ''.join(chr(i + 97) * len_values)
 
     def random_numbers():
         return round(uniform(0, 9), len_values)
     # endregion
 
-    # a = header_name(100)
+    if value_type == str:
+        m = [[random_chars() for _ in range(num_cols)]
+                             for _ in range(num_rows)]
+        # m = [[random_chars()] * num_cols
+        #                         for _ in range(num_rows)]
+    elif value_type == float:
+        m = [[random_numbers() for _ in range(num_cols)]
+                               for _ in range(num_rows)]
+        # m = [[random_numbers()] * num_cols
+        #                           for _ in range(num_rows)]
+    else:
+        raise AssertionError
 
-    m = [[header_name(i + 1) for i in range(num_cols)]] + \
-        [[random_chars() for _ in range(num_cols)]
-                         for _ in range(num_rows)]
-
-    # m = [[header_name(i + 1) for i in range(num_cols)]] + \
-    #     [[random_numbers() for _ in range(num_cols)]
-    #                        for _ in range(num_rows)]
-
-    # m = [[header_name(i + 1) for i in range(num_cols)]] + \
-    #     [[string(i) for i in range(num_cols)]
-    #                 for _ in range(num_rows)]
-
-    # m = [[header_name(i + 1)           for i in range(num_cols)]] + \
-    #     [[random_numbers()] * num_cols for _ in range(num_rows)]
+    if with_header:
+        m.insert(0, header_names())
 
     # m = tuple(tuple(row) for row in m)
 
@@ -187,10 +190,10 @@ def worksheet_to_lev(ws, *,
     c_2  = ws_h.get(c_2, c_2)
 
     lev = lev_cls(ws,
-                           meta_r=m_r,
-                           header_r=h_r,
-                           first_c=c_1,
-                           last_c=c_2)
+                  meta_r=m_r,
+                  header_r=h_r,
+                  first_c=c_1,
+                  last_c=c_2)
 
     if is_cached:
         wb_levs[lev_key] = lev

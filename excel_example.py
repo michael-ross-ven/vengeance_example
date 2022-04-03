@@ -35,8 +35,8 @@ from vengeance.excel_com.excel_constants import (xlPasteColumnWidths,
                                                  xlNormal)
 
 try:
-    from . import share
-except ImportError:
+    from vengeance_example import share
+except (ImportError, ModuleNotFoundError):
     import share
 
 xlYellow = 65535
@@ -44,9 +44,13 @@ xlBlue   = 15773696
 xlPink   = 9856255
 
 
-@print_runtime
+@print_runtime('blue')
 def main():
-    version = vengeance.__version__
+    if vengeance.conditional.loads_excel_module is False:
+        print('excel module excluded for platform compatibility')
+        return
+
+    # print(vengeance_message('vengeance: {}'.format(vengeance.__version__)))
 
     # excel_app = 'new'
     excel_app = 'any'
@@ -194,16 +198,16 @@ def lev_subsections():
 def iterate_primitive_rows():
     """ iterate rows as a list of primitive values
 
-    .rows(r_1='*h', r_2='*l'):
+    .values(r_1='*h', r_2='*l'):
         * r_1, r_2 are the start and end rows of iteration
           the default values are the specialized anchor references
           starting at header row, ending at last row
         * r_1, r_2 can also be integers corresponding to the rows in the Excel range
 
-    m = list(lev.rows())
+    m = list(lev.values())
         * as full matrix, includes header row
 
-    m = list(lev.rows('*f'))
+    m = list(lev.values('*f'))
         * as full matrix, excludes header row
 
     m = lev['*f *f:*l *l'].Value2
@@ -219,14 +223,14 @@ def iterate_primitive_rows():
     # see docstring for caveats to this
     # m = lev['*f *f:*l *l'].Value2
 
-    for row in lev.rows():
+    for row in lev.values():
         a = row[0]
 
-    m = list(lev.rows('*f', 10))
+    m = list(lev.values('*f', 10))
 
     # build new matrix from filtered rows
     m = [lev.header_names]
-    for r, row in enumerate(lev.rows('*f')):
+    for r, row in enumerate(lev.values('*f')):
         if r % 2 == 0:
             m.append(row)
 
@@ -264,7 +268,7 @@ def iterate_flux_rows():
             a = row['col_a']
             a = row[0]
 
-    m = list(lev.lev_rows(5, 10))
+    m = list(lev.flux_rows(5, 10))
 
     # extract primitive values
     m = [row.values for row in lev]
@@ -283,11 +287,11 @@ def iterate_excel_errors():
     for row in lev['B3:D6'].Value:
         a = row[-1]
 
-    # reading values with .rows() or .flux_rows() escapes these errors
-    for row in lev.rows(3, 3):
+    # reading values with .values() or .flux_rows() escapes these errors
+    for row in lev.values(3, 3):
         a = row[-1]
 
-    for row in lev.lev_rows(3, 3):
+    for row in lev.flux_rows(3, 3):
         a = row.col_c
 
 
@@ -363,7 +367,7 @@ def write_values_from_lev():
     lev_2 = share.worksheet_to_lev('Sheet2')
 
     lev_2.clear('*f *f:*l *l')
-    lev_2['*f 5'] = lev_1.rows(5, 10)
+    lev_2['*f 5'] = lev_1.values(5, 10)
 
     lev_2.clear('*f *f:*l *l')
     lev_2['*f *h'] = lev_1
