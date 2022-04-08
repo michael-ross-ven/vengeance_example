@@ -1,50 +1,58 @@
 
 """
 flux_cls
-    * a lightweight wrapper around list-of-lists matrices
-    * applies semantic names to rows based on header names
-    * when vectorization gets too complicated, and you need (or want)
-      efficient row-major iteration
+    * similar idea behind a pandas DataFrame, but is more closely aligned with Python's design philosophy
+    * when you're willing to trade for a little bit of speed for a lot simplicity
+    * a lightweight, pure-python wrapper class around list of lists
+    * applies named attributes to rows; values are mutable during iteration
+    * provides convenience aggregate operations (sort, filter, groupby, etc)
 """
+import sys
+
 from collections import namedtuple
-from dataclasses import dataclass
 from datetime import datetime
+from pprint import pprint as prettyprint
 from typing import Generator
 from typing import Union
+from typing import Any
 
 import vengeance
 from vengeance import flux_cls
 from vengeance import print_runtime
+from vengeance import print_performance
 from vengeance import is_date
+from vengeance import to_datetime
 from vengeance.util.text import vengeance_message
 from vengeance.classes.flux_row_cls import flux_row_cls
 
 try:
-    from vengeance_example import share
-except (ImportError, ModuleNotFoundError):
     import share
+except (ModuleNotFoundError, ImportError):
+    from . import share
 
+python_version = sys.version_info
 profiler = share.resolve_profiler_function()
 
 
 @print_runtime('blue')
 def main():
     # print(vengeance_message('vengeance: {}'.format(vengeance.__version__)))
+    # help(flux_cls)
 
     instantiate_flux()
+    # invalid_instantiations()
 
     flux = flux_cls(share.random_matrix(num_rows=100,
                                         num_cols=5,
                                         len_values=3))
-
     iterate_flux_rows(flux)
     iterate_primitive_rows(flux)
 
     flux_sort_and_filter_methods(flux)
     flux_grouping_methods(flux)
 
-    flux_row_methods(flux)
     flux_jagged_rows(flux)
+    flux_rows_methods(flux)
     flux_column_methods(flux)
     flux_column_values(flux)
 
@@ -57,60 +65,11 @@ def main():
     # write_to_excel(flux)
 
     flux_subclass()
-
-    attribute_access_performance(flux)
-
-
-def invalid_instantiations():
-    """
-    1) matrix must have at least 2 dimensions
-    2) certain reserved column names cannot appear as
-    dynamic column names in matrix, eg
-        __bool__
-        __dict__
-        ...
-        __weakref__
-        _headers
-        array
-        dict
-        header_names
-        headers
-        is_empty
-        is_header_row
-        is_jagged
-        join_values
-        namedrow
-        namedtuple
-        reserved_names
-        values
-    """
-    from vengeance.classes.flux_row_cls import flux_row_cls
-
-    reserved = flux_row_cls.reserved_names()
-    reserved = '\n'.join(reserved)
-    print('reserved header names: \n{}'.format(reserved))
-
-    try:
-        flux = flux_cls()                       # empty matrix is fine
-        flux = flux_cls(['one', 'dimension'])   # this is not, unknown if list is meant to be a row or column
-    except IndexError as e:
-        print(e)
-
-    try:
-        flux = flux_cls([['_headers',
-                          'values',
-                          'header_names',
-                          'is_jagged',
-                          '__dict__',
-                          '__len__']])
-    except NameError as e:
-        print(e)
-
-    print()
+    # attribute_access_performance()
 
 
 def instantiate_flux():
-
+    # region {matrix objects}
     some_namedtuple = namedtuple('some_namedtuple', ('col_a', 'col_b', 'col_c'))
 
     class some_cls:
@@ -135,8 +94,7 @@ def instantiate_flux():
             self.col_a = v_a
             self.col_b = v_b
             self.col_c = v_c
-
-    # invalid_instantiations()
+    # endregion
 
     # matrix organized like csv data, column names are provided in first row
     m = share.random_matrix(num_rows=20,
@@ -203,6 +161,67 @@ def instantiate_flux():
     flux_b = flux_cls(m)
 
     return flux
+
+
+def invalid_instantiations():
+    """
+    1) matrix must have at least 2 dimensions
+    2) certain reserved column names cannot appear as
+       dynamic column names in matrix, eg
+        _headers
+        values
+        row_label
+        __bool__
+        __class__
+        ...
+        __str__
+        __subclasshook__
+        __weakref__
+        _flux_row_cls__raise_attribute_error
+        _preview_as_array
+        _preview_as_tuple
+        dict
+        header_names
+        headers
+        is_empty
+        is_header_row
+        is_jagged
+        join_values
+        namedrow
+        namedtuple
+        reserved_names
+    """
+    from vengeance.classes.flux_row_cls import flux_row_cls
+
+    # no arguments is fine
+    flux = flux_cls()
+
+    try:
+        '''
+        a one-dimensional list is not fine, unknown if was meant to be a:
+            row:    [['col_a', 'a']] 
+        or 
+            column: [['col_a'], ['a']]
+        '''
+        flux = flux_cls(['col_a', 'a'])
+    except IndexError as e:
+        print(e)
+
+    reserved = flux_row_cls.reserved_names()
+    reserved = '\n'.join(reserved)
+    print('reserved header names: \n{}'.format(reserved))
+
+    try:
+        flux = flux_cls([['_headers',
+                          'values',
+                          'header_names',
+                          'is_jagged',
+                          '__dict__',
+                          '__len__']])
+    except NameError as e:
+        print(e)
+
+    print()
 
 
 def iterate_flux_rows(flux: flux_cls):
@@ -294,29 +313,29 @@ def iterate_primitive_rows(flux: flux_cls):
         a = row.values[0]
         b = row.values[1]
 
-    # byref values
-    m_1 = list(flux.values())
+    # values
+    m = list(flux.values())
     # or
-    m_1 = [*flux.values()]
+    m = [*flux.values()]
     # or
-    m_1 = [row.values for row in flux]
-
-    # copy of values
-    m_2 = [[*row.values] for row in flux]
-
-    # modifications to m_1 will also change flux.matrix values
-    a = flux.matrix[1]
-    m_1[1][0] = 'm_1'
-    m_2[1][0] = 'm_2'
+    m = [[*row.values] for row in flux]
 
     # build new matrix of primitive values
-    m = [flux.header_names()]
-    m.extend([[*row.values] for row in flux.matrix[1:5]])
+    m = [[h.replace('col', 'new_col') for h in flux.header_names()]] + \
+        [[*row.values] for row in flux.matrix[3:5]]
+    flux = flux_cls(m)
 
     pass
 
 
 def flux_sort_and_filter_methods(flux: flux_cls):
+    """
+    methodnames ending in -ed are not in-place, like python's sorted() and sort()
+      flux.sort()
+      flux = flux.sorted()
+      flux.filter()
+      flux = flux.filtered()
+    """
 
     # region {flux filter functions}
 
@@ -354,6 +373,8 @@ def flux_sort_and_filter_methods(flux: flux_cls):
     flux_b = flux.copy()
 
     # in-place modifications
+    flux_b.reverse()
+
     flux_b.sort('col_b')
     flux_b.sort('col_a', 'col_b', 'col_c',
                 reverse=[False, True, False])
@@ -363,20 +384,16 @@ def flux_sort_and_filter_methods(flux: flux_cls):
     # flux_b.filter(lambda _row_: str(_row_.col_b) != 'b')
     flux_b.filter_by_unique('col_a', 'col_b')
 
-    # methodnames ending in -ed are not in-place,
-    # like python's sorted() and sort()
-    #   flux.sort()
-    #   flux = flux.sort-ed()
-    #   flux.filter()
-    #   flux = flux.filter-ed()
-
     # returns new flux_cls
+    flux_b = flux_a.reversed()
+
     flux_b = flux_a.sorted('col_b')
     flux_b = flux_a.sorted('col_a', 'col_b', 'col_c',
                            reverse=[True, False, True])
 
     flux_b = flux_a.filtered(starts_with_a)
     flux_b = flux_a.filtered(starts_with_criteria)
+    # flux_b = flux_a.filtered(lambda _row_: str(_row_.col_b) != 'b')
     flux_b = flux_a.filtered_by_unique('col_a', 'col_b')
 
     pass
@@ -384,16 +401,14 @@ def flux_sort_and_filter_methods(flux: flux_cls):
 
 def flux_grouping_methods(flux: flux_cls):
     """
-    an EXTREMELY important method introduced here:
+    two extremely important methods introduced here:
         .map_rows_append()
+        .map_rows_nested()
     """
     flux = flux.copy()
 
-    flux.label_row_indices()
-
-    # flux.num_rows
-    flux['col_a'] = ['a'] * len(flux)
-    flux['col_b'] = ['b'] * len(flux)
+    flux['col_a'] = ['a'] * flux.num_rows
+    flux['col_b'] = ['b'] * flux.num_rows
 
     a = flux.unique('col_a')
     a = flux.unique('col_a', 'col_b')
@@ -408,7 +423,7 @@ def flux_grouping_methods(flux: flux_cls):
 
     # specify column values to map
     d = flux.map_rows('col_a')
-    d = flux.map_rows('col_a', 'col_b')
+    d = flux.map_rows('col_a', 'col_b', 'col_c')
     d = flux.map_rows(1, 2)
     d = flux.map_rows(slice(-3, -1))
 
@@ -420,67 +435,36 @@ def flux_grouping_methods(flux: flux_cls):
                                     for k, rows in d.items()}
 
     # map dictionary values to types other than flux_row_cls
-    d = flux.map_rows_append('col_a', 'col_b', rowtype=dict)
-    d = flux.map_rows_append('col_a', 'col_b', rowtype=list)
-    d = flux.map_rows_append('col_a', 'col_b', rowtype=tuple)
-
     d = flux.map_rows_append('col_a', 'col_b', rowtype='dict')
     d = flux.map_rows_append('col_a', 'col_b', rowtype='list')
     d = flux.map_rows_append('col_a', 'col_b', rowtype='tuple')
     d = flux.map_rows_append('col_a', 'col_b', rowtype='namedrow')
     d = flux.map_rows_append('col_a', 'col_b', rowtype='namedtuple')
 
-    # group rows: hierarchically nested column values
-    m = [['col_a', 'col_b', 'col_c']]
-    m.extend(['a', 'b', 'c'] for _ in range(3))
-    m.extend(['c', 'd', 'e'] for _ in range(3))
-    m.extend(['e', 'f', 'g'] for _ in range(3))
-    m.extend(['a', 'b', 'g'] for _ in range(2))
-    m.extend(['c', 'b', 'e'] for _ in range(2))
+    # or use actual class instead of string
+    # d = flux.map_rows_append('col_a', 'col_b', rowtype=dict)
+    # d = flux.map_rows_append('col_a', 'col_b', rowtype=list)
+    # d = flux.map_rows_append('col_a', 'col_b', rowtype=tuple)
 
+    # group rows: hierarchically nested column values
+    m = [['col_a', 'col_b', 'col_c']] + \
+        [['a', 'b', 'c'] for _ in range(3)] + \
+        [['c', 'd', 'e'] for _ in range(3)] + \
+        [['e', 'f', 'g'] for _ in range(3)] + \
+        [['a', 'b', 'g'] for _ in range(2)] + \
+        [['c', 'b', 'e'] for _ in range(5)]
     flux_b = flux_cls(m)
-    d_1 = flux_b.group_rows_append('col_a', 'col_b')
-    # compare output to .map_rows_append()
+
+    # map_rows_nested is also called groupby
+    d_1 = flux_b.map_rows_nested('col_a', 'col_b')
+    # d_1 = flux_b.groupby('col_a', 'col_b')
+
+    # compare differences to .map_rows_append()
     d_2 = flux_b.map_rows_append('col_a', 'col_b')
 
     # .contiguous()
     #   group rows where *adjacent* values are identical
     items = list(flux.contiguous('col_a'))
-
-    pass
-
-
-def flux_row_methods(flux: flux_cls):
-    flux_a = flux.copy()
-    flux_b = flux.copy()
-
-    rows = share.random_matrix(10,
-                               flux.num_cols,
-                               with_header=False)
-
-    # insert / append rows from another raw lists
-    flux_a.append_rows(rows)
-    flux_a.insert_rows(5, rows[:3])
-
-    # insert / append rows from another flux_cls
-    flux_b.insert_rows(1, flux_a)
-    flux_b.append_rows(flux_a.matrix[10:15])
-
-    # delete all but first 10 rows
-    # del flux_a.matrix[11:]
-    flux_a.shorten_to(10)
-    flux_b.shorten_to(10)
-
-    flux_a = flux.copy()
-    flux_b = flux.copy()
-
-    # append rows from flux_a and flux_b
-    flux_c = flux_a + flux_b
-
-    # inplace add
-    flux_a += flux_b.matrix[-5:]
-    flux_a += flux_b.matrix[10:15]
-    flux_a += [['a', 'b', 'c']] * 10
 
     pass
 
@@ -518,6 +502,41 @@ def flux_jagged_rows(flux: flux_cls):
     pass
 
 
+def flux_rows_methods(flux: flux_cls):
+    flux_a = flux.copy()
+    flux_b = flux.copy()
+
+    rows = share.random_matrix(10,
+                               flux.num_cols,
+                               with_header=False)
+
+    # insert / append rows from another raw lists
+    flux_a.append_rows(rows)
+    flux_a.insert_rows(5, rows[:3])
+
+    # insert / append rows from another flux_cls
+    flux_b.insert_rows(1, flux_a)
+    flux_b.append_rows(flux_a.matrix[10:15])
+
+    # delete all but first 10 rows
+    # del flux_a.matrix[11:]
+    flux_a.shorten_to(10)
+    flux_b.shorten_to(10)
+
+    flux_a = flux.copy()
+    flux_b = flux.copy()
+
+    # append rows from flux_a and flux_b
+    flux_c = flux_a + flux_b
+
+    # inplace add
+    flux_a += flux_b.matrix[-5:]
+    flux_a += flux_b.matrix[10:15]
+    flux_a += [['a', 'b', 'c']] * 10
+
+    pass
+
+
 def flux_column_methods(flux: flux_cls):
     flux = flux.copy()
 
@@ -550,7 +569,7 @@ def flux_column_methods(flux: flux_cls):
     flux.reassign_columns('col_c',
                           'col_b',
                           {'col_a': 'renamed_a'},
-                          {'col_a': 'renamed_a_dup'},
+                          {'col_a': 'renamed_a__duplicate'},
                           '(inserted_a)',
                           '(inserted_b)',
                           '(inserted_c)')
@@ -559,7 +578,7 @@ def flux_column_methods(flux: flux_cls):
     flux = flux_cls(share.random_matrix(num_rows=5,
                                         num_cols=5))
     flux_b = flux.copy().reassign_columns({'col_c': 'renamed_c'},
-                                          {'col_c': 'renamed_d'},
+                                          {'col_d': 'renamed_d'},
                                           '(inserted_a)')
 
     pass
@@ -585,9 +604,15 @@ def flux_column_values(flux: flux_cls):
     cols = flux[1:3]
 
     a, b, c = flux.columns('col_a', 'col_b', 'col_c')
+    a, b, c = flux['col_a', 'col_b', 'col_c']
+
+    # primitive values
+    for a, b, c in zip(*flux['col_a', 'col_b', 'col_c']):
+        pass
 
     # append a new column
     flux['append_d'] = ['append'] * flux.num_rows
+
     # insert a new column
     flux[(0, 'insert_a')] = [['insert'] for _ in range(flux.num_rows)]
     flux[(0, 'enum')] = flux.indices()
@@ -759,13 +784,13 @@ def flux_subclass():
          ['id-003', 'bob',   2, 5, '2019-07-22'],
          ['id-004', 'chris', 2, 1, '2019-06-28'],
          ['id-005',  None,   7, 1,  None]]
-    flux = flux_custom_cls(m, 'apples')
+    flux = flux_custom_cls(m, product='apples')
 
-    # commands = flux_custom_cls.commands
-    # print(commands)
-    # a = repr(flux)
+    # prettyprint(flux_custom_cls.commands)
+    # print(repr(flux))
 
-    flux.execute_commands(flux.commands, print_commands=True)
+    flux.execute_commands(flux.commands)
+    # flux.execute_commands(flux.commands, print_commands=True)
 
     # profiler: useful for helping to debug any performance issues
     # flux.execute_commands(flux.commands, profiler=True)
@@ -777,22 +802,28 @@ def flux_subclass():
     pass
 
 
-# region @types
-@dataclass
-class flux_row_custom_cls(flux_row_cls):
-    """ used for autocompletion and type-hints """
-    transaction_id: str
-    name:           Union[str, None]
-    apples_sold:    int
-    apples_bought:  int
-    date:           Union[str, datetime]
+# region {@flux_row type}
+
+# dataclass requires python 3.7+
+if python_version >= (3, 7):
+    from dataclasses import dataclass
+
+    @dataclass
+    class flux_row_custom_cls(flux_row_cls):
+        """ used for autocompletion and type-hints """
+        transaction_id: str
+        name:           Union[str, None]
+        apples_sold:    Any
+        apples_bought:  int
+        date:           Union[str, datetime]
+else:
+    flux_row_custom_cls = flux_row_cls
 # endregion
 
 
 class flux_custom_cls(flux_cls):
 
     # high-level summary of state transformations
-    # (sort and append_columns call to the super class method)
     commands = (('sort',  ('apples_sold', 'apples_bought'),
                           {'reverse': [False, True]}),
                 '_replace_null_names',
@@ -805,15 +836,22 @@ class flux_custom_cls(flux_cls):
                                        'apple_bonus'))
                 )
 
-    def __init__(self, matrix, product):
+    def __init__(self, matrix=None, product=None):
         super().__init__(matrix)
 
-        self.product          = product
+        self.product = product
         self.num_unique_names = None
 
-    # def __iter__(self) -> Generator[flux_row_custom_cls, None, None]:
-    #     """ used for autocompletion and type-hints """
-    #     return (row for row in self.matrix[1:])
+    def __iter__(self) -> Generator[flux_row_custom_cls, None, None]:
+        """ @flux_row type (requires python 3.7+)
+        overriding this method is completely optional, but helps with
+        autocompletion and type-hints on flux_row_cls names in IDE
+
+        eg:
+            for row in self:
+                row.{all properties of flux_row_custom_cls will show up in autocomplete}
+        """
+        return super().__iter__()
 
     def _replace_null_names(self):
         for row in self:
@@ -821,8 +859,6 @@ class flux_custom_cls(flux_cls):
                 row.name = 'unknown'
 
     def _convert_dates(self):
-        from vengeance import to_datetime
-
         # if no errors are expected
         # self['date'] = [to_datetime(v) for v in self['date']]
 
@@ -850,49 +886,101 @@ class flux_custom_cls(flux_cls):
         if error_indices:
             self.preview_indices = error_indices
             a = self._preview_as_array
-            assert False, f'validation failed'
+            b = self._preview_as_tuples
+            raise AssertionError('validation failed')
 
     def __repr__(self):
         return 'product: {} {}'.format(self.product,
                                        super().__repr__())
 
 
-# @print_runtime
-# @profiler
-def attribute_access_performance(flux: flux_cls):
+def attribute_access_performance():
     """
-    if speed of attribute accesses is paramount, use:
-        c = flux.headers['column']
+    if speed of attribute accesses is paramount, use row.values for attribute access
+    eg:
+        c_a = flux.headers['col_a']
         for row in flux:
-            row.values[c] = 'bleh'
-    or
-        nr = flux.namedrows()
-        for row in nr:
-    or
-        for row in flux.namedtuples():
+            a = row.values[c_a]
+            row.values[c_a] = 'a'
+
+    num_rows = 1_000_000, Ryzen 5800X
+    ν: @flux_example._attribute_access_normal:        843.2 ms
+    ν: @flux_example._attribute_access_namedtuples:   244.0 ms
+    ν: @flux_example._attribute_access_rva:           148.1 ms
+    ν: @flux_example._attribute_access_values:        107.2 ms
+    ν: @flux_example._attribute_access_values_unpack: 67.8 ms
     """
     # from vengeance.classes.flux_row_cls import flux_row_cls
+    # from vengeance.util.text import object_name
 
-    # flux_row_cls.__getattr__ = profiler(flux_row_cls.__getattr__)
-    # flux_row_cls.__setattr__ = profiler(flux_row_cls.__setattr__)
+    # if object_name(profiler) == 'LineProfiler':
+    #     flux_row_cls.__getattr__ = profiler(flux_row_cls.__getattr__)
+    #     flux_row_cls.__setattr__ = profiler(flux_row_cls.__setattr__)
 
+    num_rows = 1_000_000
+
+    flux_a = flux_cls(share.random_matrix(num_rows))
+    flux_b = flux_a.copy()
+    flux_c = flux_a.copy()
+    flux_d = flux_a.copy()
+    flux_e = flux_a.copy()
+
+    _attribute_access_normal(flux_a)
+    _attribute_access_namedtuples(flux_b)
+    _attribute_access_rva(flux_c)
+    _attribute_access_values(flux_d)
+    _attribute_access_values_unpack(flux_e)
+
+    print()
+
+
+@print_runtime
+def _attribute_access_normal(flux: flux_cls):
     for row in flux:
-        #   read row values
-        # a = row.col_a
-        # b = row.col_b
-        # c = row.col_c
+        a = row.col_a
+        b = row.col_b
+        c = row.col_c
 
-        #   modify row values
         # row.col_a = 'a'
         # row.col_b = 'b'
         # row.col_c = 'c'
 
-        #   read and modify row values
-        row.col_a = row.col_a
-        row.col_b = row.col_b
-        row.col_c = row.col_c
 
-        # row.values = [None] * len(row)
+@print_runtime
+def _attribute_access_namedtuples(flux: flux_cls):
+    for row in flux.namedtuples():
+        a = row.col_a
+        b = row.col_b
+        c = row.col_c
+
+
+@print_runtime
+def _attribute_access_rva(flux: flux_cls):
+    rva = flux.row_values_accessor('col_a', 'col_b', 'col_c')
+    for row in flux:
+        a, b, c = rva(row)
+
+
+@print_runtime
+def _attribute_access_values(flux: flux_cls):
+    c_a = flux.headers['col_a']
+    c_b = flux.headers['col_b']
+    c_c = flux.headers['col_c']
+
+    for row in flux:
+        a = row.values[c_a]
+        b = row.values[c_b]
+        c = row.values[c_c]
+
+        # row.values[c_a] = 'a'
+        # row.values[c_b] = 'b'
+        # row.values[c_c] = 'c'
+
+
+@print_runtime
+def _attribute_access_values_unpack(flux: flux_cls):
+    for row in flux:
+        a, b, c = row.values
 
 
 if __name__ == '__main__':

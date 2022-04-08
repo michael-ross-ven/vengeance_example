@@ -55,6 +55,5 @@ def __add_sys_args(cli_str):
 
 
 # for debugging in IDE
-# parse_cmd_line('write_file_and_wait --content invoke_python_test_1')
-
-parse_cmd_line()
+# if __name__ == '__main__':
+#     parse_cmd_line('write_file_and_wait --content invoke_python_test_1')

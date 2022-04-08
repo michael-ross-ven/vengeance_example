@@ -35,9 +35,9 @@ from vengeance.excel_com.excel_constants import (xlPasteColumnWidths,
                                                  xlNormal)
 
 try:
-    from vengeance_example import share
-except (ImportError, ModuleNotFoundError):
     import share
+except (ModuleNotFoundError, ImportError):
+    from . import share
 
 xlYellow = 65535
 xlBlue   = 15773696
@@ -51,9 +51,10 @@ def main():
         return
 
     # print(vengeance_message('vengeance: {}'.format(vengeance.__version__)))
+    # help(lev_cls)
 
-    # excel_app = 'new'
-    excel_app = 'any'
+    excel_app = 'new'
+    # excel_app = 'any'
     # excel_app = 'empty'
     share.set_project_workbook(excel_app,
                                ReadOnly=True,
@@ -124,7 +125,7 @@ def instantiate_lev(ws_name):
 
     a = lev.has_headers
     a = lev.headers
-    a = lev.header_names
+    a = lev.header_names()
 
     # named ranges
     a = lev.named_ranges
@@ -176,7 +177,7 @@ def lev_subsections():
     lev_3 = share.worksheet_to_lev('subsections', c_1='<sect_3/>', c_2='<sect_3/>')
 
     a = lev_1.meta_headers
-    a = lev_1.meta_header_names
+    a = lev_1.meta_header_names()
 
     a = lev_1.last_r
     b = lev_2.last_r
@@ -257,11 +258,16 @@ def iterate_flux_rows():
     lev = share.worksheet_to_lev('subsections', c_1='<sect_1>', c_2='</sect_1>')
 
     for row in lev:
-        a = row.address
-        a = row.header_names
+        rp = repr(row)
+
+        a = row.row_label
+        a = row.header_names()
         a = row.values
 
-        # a = row.array       # meant as a debugging tool in PyCharm
+        # to help with debugging
+        # a = row._preview_as_array
+        # a = row._preview_as_tuple
+        # i = row.row_label
 
         if 'col_a' in lev.headers:
             a = row.col_a
@@ -272,6 +278,7 @@ def iterate_flux_rows():
 
     # extract primitive values
     m = [row.values for row in lev]
+    m = list(lev.values())
 
     # build new matrix from filtered rows
     m = [lev.header_names]
@@ -304,7 +311,7 @@ def convert_to_flux():
     """
     lev  = share.worksheet_to_lev('Sheet1')
     flux = flux_cls(lev)
-
+    # or just
     # flux = share.worksheet_to_flux('Sheet1')
 
     for row in flux:
