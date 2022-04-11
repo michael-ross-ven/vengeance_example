@@ -33,15 +33,14 @@ from vengeance.excel_com.excel_constants import (xlPasteColumnWidths,
                                                  xlNone,
                                                  xlMinimized,
                                                  xlNormal)
+xlYellow = 65535
+xlBlue   = 15773696
+xlPink   = 9856255
 
 try:
     import share
 except (ModuleNotFoundError, ImportError):
     from . import share
-
-xlYellow = 65535
-xlBlue   = 15773696
-xlPink   = 9856255
 
 
 @print_runtime('blue')

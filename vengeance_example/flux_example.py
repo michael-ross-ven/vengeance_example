@@ -4,7 +4,7 @@ flux_cls
     * similar idea behind a pandas DataFrame, but is more closely aligned with Python's design philosophy
     * when you're willing to trade for a little bit of speed for a lot simplicity
     * a lightweight, pure-python wrapper class around list of lists
-    * applies named attributes to rows; values are mutable during iteration
+    * applies named attributes to rows; attribute values are mutable during iteration
     * provides convenience aggregate operations (sort, filter, groupby, etc)
 """
 import sys
@@ -168,7 +168,7 @@ def invalid_instantiations():
     1) matrix must have at least 2 dimensions
     2) certain reserved column names cannot appear as
        dynamic column names in matrix, eg
-        _headers
+        headers
         values
         row_label
         __bool__
@@ -182,7 +182,6 @@ def invalid_instantiations():
         _preview_as_tuple
         dict
         header_names
-        headers
         is_empty
         is_header_row
         is_jagged
@@ -208,11 +207,10 @@ def invalid_instantiations():
         print(e)
 
     reserved = flux_row_cls.reserved_names()
-    reserved = '\n'.join(reserved)
-    print('reserved header names: \n{}'.format(reserved))
+    print('reserved header names: \n{}'.format('\n'.join(reserved)))
 
     try:
-        flux = flux_cls([['_headers',
+        flux = flux_cls([['headers',
                           'values',
                           'header_names',
                           'is_jagged',
@@ -321,9 +319,10 @@ def iterate_primitive_rows(flux: flux_cls):
     m = [[*row.values] for row in flux]
 
     # build new matrix of primitive values
-    m = [[h.replace('col', 'new_col') for h in flux.header_names()]] + \
-        [[*row.values] for row in flux.matrix[3:5]]
-    flux = flux_cls(m)
+    m = [[h.replace('col', 'new_col') for h in flux.header_names()]]
+    m.extend(flux.values(3, 5))
+
+    flux_b = flux_cls(m)
 
     pass
 
@@ -405,13 +404,29 @@ def flux_grouping_methods(flux: flux_cls):
         .map_rows_append()
         .map_rows_nested()
     """
+    from vengeance import to_datetime
+
+    # region {closures}
+    def extract_month(row):
+        dt = to_datetime(row.date, '%Y-%m-%d')
+        return dt.month
+
+    def extract_year_and_month(row):
+        dt = to_datetime(row.date, '%Y-%m-%d')
+        return dt.year, dt.month
+
+    # endregion
     flux = flux.copy()
 
     flux['col_a'] = ['a'] * flux.num_rows
     flux['col_b'] = ['b'] * flux.num_rows
 
     a = flux.unique('col_a')
-    a = flux.unique('col_a', 'col_b')
+    b = flux.unique('col_a', 'col_b')
+
+    # original ordering of values is maintained
+    s = flux.unique.__func__.__doc__
+    t = type(a)                                 # <class 'dict_keys'>
 
     # .map_rows() and .map_rows_append() have slightly different behavior
     d_1 = flux.map_rows('col_a', 'col_b')
@@ -455,16 +470,33 @@ def flux_grouping_methods(flux: flux_cls):
         [['c', 'b', 'e'] for _ in range(5)]
     flux_b = flux_cls(m)
 
-    # map_rows_nested is also called groupby
-    d_1 = flux_b.map_rows_nested('col_a', 'col_b')
-    # d_1 = flux_b.groupby('col_a', 'col_b')
+    # .groupby() aliased to .map_rows_nested()
+    # d_1 = flux_b.map_rows_nested('col_a', 'col_b')
+    # d_2 = flux_b.groupby('col_a', 'col_b')
 
     # compare differences to .map_rows_append()
+    d_1 = flux_b.map_rows_nested('col_a', 'col_b')
     d_2 = flux_b.map_rows_append('col_a', 'col_b')
+    # a = list(d_1.keys())
+    # b = list(d_2.keys())
+
+    m = [['date', 'col_a', 'col_b', 'col_c']] + \
+        [['2000-01-01', 'a', 'b', 'c'] for _ in range(3)] + \
+        [['2001-01-01', 'c', 'd', 'e'] for _ in range(3)] + \
+        [['2002-01-01', 'e', 'f', 'g'] for _ in range(3)] + \
+        [['2003-01-01', 'a', 'b', 'g'] for _ in range(2)] + \
+        [['2004-01-01', 'c', 'b', 'e'] for _ in range(5)]
+    flux_b = flux_cls(m)
+
+    # mapping methods also accept a function
+    d_1 = flux_b.map_rows_nested(extract_year_and_month)
+    d_2 = flux_b.map_rows_append(extract_year_and_month)
+    # a = list(d_1.keys())
+    # b = list(d_2.keys())
 
     # .contiguous()
     #   group rows where *adjacent* values are identical
-    items = list(flux.contiguous('col_a'))
+    items = list(flux.contiguous('col_c'))
 
     pass
 
@@ -493,10 +525,10 @@ def flux_jagged_rows(flux: flux_cls):
     flux_repr_jagged = repr(flux)
     row_repr_jagged  = repr(row_too_long)
 
-    assert '🗲jagged' not in flux_repr_before
+    assert '🗲jagged🗲' not in flux_repr_before
     assert '🗲jagged' not in row_repr_before
 
-    assert '🗲jagged' in flux_repr_jagged
+    assert '🗲jagged🗲' in flux_repr_jagged
     assert '🗲jagged' in row_repr_jagged
 
     pass
@@ -564,23 +596,15 @@ def flux_column_methods(flux: flux_cls):
                          'renamed_b': 'col_b'})
 
     # encapsulate insertion, deletion and renaming of columns within single function
-    flux = flux_cls(share.random_matrix(num_rows=5,
-                                        num_cols=5))
-    flux.reassign_columns('col_c',
-                          'col_b',
-                          {'col_a': 'renamed_a'},
-                          {'col_a': 'renamed_a__duplicate'},
-                          '(inserted_a)',
-                          '(inserted_b)',
-                          '(inserted_c)')
-
-    # return new flux_cls from reassign_columns()
-    flux = flux_cls(share.random_matrix(num_rows=5,
-                                        num_cols=5))
-    flux_b = flux.copy().reassign_columns({'col_c': 'renamed_c'},
-                                          {'col_d': 'renamed_d'},
-                                          '(inserted_a)')
-
+    flux_b = flux_cls(share.random_matrix(num_rows=5,
+                                          num_cols=5))
+    flux_b.reassign_columns('col_c',
+                            'col_b',
+                            {'col_a': 'renamed_a'},
+                            {'col_a': 'renamed_a__duplicate'},
+                            '(inserted_a)',
+                            '(inserted_b)',
+                            '(inserted_c)')
     pass
 
 
@@ -652,7 +676,7 @@ def flux_column_values(flux: flux_cls):
 
 def flux_join():
 
-    flux_a = flux_cls([['name', 'id', 'sell_price', 'model_num', 'cost'],
+    flux_a = flux_cls([['name', 'id_a', 'sell_price', 'model_num', 'cost'],
                         ['washer', '#6151-165', 50.10, '-x2', None],
                         ['washer', '#6151-166', 50.10, '-x3', None],
                         ['washer', '#6151-167', 50.10, '-x4', None],
@@ -660,33 +684,39 @@ def flux_join():
                         ['dryer', '#8979-155', 100.50, 'a', None],
                         ['dishwasher', '#6654-810', 130.00, 'v5', None]])
 
-    flux_b = flux_cls([['name', 'id', 'cost', 'weight', 'amount'],
+    flux_b = flux_cls([['name', 'id_b', 'cost', 'weight', 'amount'],
                        ['washer', '#6151-165', 50.10, 33.33, 4],
                        ['dryer', '#8979-154', 100.50, 50.50, 6],
                        ['dishwasher', '#6654-810', 130.00, 100.33, 10]])
 
-    rows_b = flux_b.map_rows('id')
+    flux_a.append_columns('amount')
 
-    # join rows manually
+    # join rows with manual lookups
+    mapped_rows_b = flux_b.map_rows('id_b')
+
     for row_a in flux_a:
-        row_b = rows_b.get(row_a.id)
+        row_b = mapped_rows_b.get(row_a.id_a)
         if row_b is None:
             continue
 
-        row_a.cost = row_b.cost
+        row_a.cost   = row_b.cost
+        row_a.amount = row_b.amount
 
-    # join rows with .join method
-    for row_a, row_b in flux_a.join(flux_b, {'id':
-                                             'id'}):
-        row_a.cost = row_b.cost
-        # row_a.join_values(row_b)
+    # .join method
+    # flux.join(flux_other, {'column_self': 'column_other'})
+    for row_a, row_b in flux_a.join(flux_b, {'id_a': 'id_b'}):
+        row_a.cost   = row_b.cost
+        row_a.amount = row_b.amount
 
-    # or copy all column values in common with row_b
-    flux_a.append_columns('amount')
-    row_a = flux_a.matrix[1]
-    row_b = flux_a.matrix[1]
+        # or copy all column values in common with row_b
+        row_a.join_values(row_b)
 
-    row_a.join_values(row_b)
+    mapped_rows_b = flux_b.map_rows_append('id_b')
+
+    # flux.join(any_dict, 'column_self')
+    for row_a, rows_b in flux_a.join(mapped_rows_b, 'id_a'):
+        row_a.cost   = sum([row_b.cost for row_b in rows_b])
+        row_a.amount = sum([row_b.amount for row_b in rows_b])
 
     pass
 
@@ -802,25 +832,6 @@ def flux_subclass():
     pass
 
 
-# region {@flux_row type}
-
-# dataclass requires python 3.7+
-if python_version >= (3, 7):
-    from dataclasses import dataclass
-
-    @dataclass
-    class flux_row_custom_cls(flux_row_cls):
-        """ used for autocompletion and type-hints """
-        transaction_id: str
-        name:           Union[str, None]
-        apples_sold:    Any
-        apples_bought:  int
-        date:           Union[str, datetime]
-else:
-    flux_row_custom_cls = flux_row_cls
-# endregion
-
-
 class flux_custom_cls(flux_cls):
 
     # high-level summary of state transformations
@@ -839,19 +850,8 @@ class flux_custom_cls(flux_cls):
     def __init__(self, matrix=None, product=None):
         super().__init__(matrix)
 
-        self.product = product
+        self.product          = product
         self.num_unique_names = None
-
-    def __iter__(self) -> Generator[flux_row_custom_cls, None, None]:
-        """ @flux_row type (requires python 3.7+)
-        overriding this method is completely optional, but helps with
-        autocompletion and type-hints on flux_row_cls names in IDE
-
-        eg:
-            for row in self:
-                row.{all properties of flux_row_custom_cls will show up in autocomplete}
-        """
-        return super().__iter__()
 
     def _replace_null_names(self):
         for row in self:
