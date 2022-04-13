@@ -18,7 +18,7 @@ Excel
 
 lev_cls:
     * automatically tracks range boundaries
-    * applies semantic names to rows based on header names
+    * applies semantic names to rows based on header row
 """
 
 from time import sleep

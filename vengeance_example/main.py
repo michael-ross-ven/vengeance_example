@@ -17,7 +17,15 @@ except (ModuleNotFoundError, ImportError):
 
 
 def main():
-    flux_example.main()
+    import sys
+    from pathlib import Path
+
+    # module_path = str(Path(__file__).parent.parent.parent)
+    # module_path2 = str(Path(__file__).parent.parent)
+    sys.path.append('..')
+    a = sys.path
+
+    # flux_example.main()
     # excel_example.main()
     pass
 

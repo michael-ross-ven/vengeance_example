@@ -6,6 +6,7 @@ flux_cls
     * a lightweight, pure-python wrapper class around list of lists
     * applies named attributes to rows; attribute values are mutable during iteration
     * provides convenience aggregate operations (sort, filter, groupby, etc)
+    * excellent for prototyping and data-wrangling
 """
 import sys
 
@@ -53,7 +54,7 @@ def main():
 
     flux_jagged_rows(flux)
     flux_rows_methods(flux)
-    flux_column_methods(flux)
+    flux_columns_methods(flux)
     flux_column_values(flux)
 
     flux_join()
@@ -424,9 +425,9 @@ def flux_grouping_methods(flux: flux_cls):
     a = flux.unique('col_a')
     b = flux.unique('col_a', 'col_b')
 
-    # original ordering of values is maintained
-    s = flux.unique.__func__.__doc__
-    t = type(a)                                 # <class 'dict_keys'>
+    # original ordering of values is maintained: returns ordereddict keys, not an unordered set
+    s = flux.unique.__doc__
+    t = type(a)                                 # <ordereddict keys>
 
     # .map_rows() and .map_rows_append() have slightly different behavior
     d_1 = flux.map_rows('col_a', 'col_b')
@@ -569,7 +570,7 @@ def flux_rows_methods(flux: flux_cls):
     pass
 
 
-def flux_column_methods(flux: flux_cls):
+def flux_columns_methods(flux: flux_cls):
     flux = flux.copy()
 
     flux.rename_columns({'col_a': 'renamed_a',
@@ -896,7 +897,7 @@ class flux_custom_cls(flux_cls):
 
 def attribute_access_performance():
     """
-    if speed of attribute accesses is paramount, use row.values for attribute access
+    if speed of attribute accesses is paramount, use row.values
     eg:
         c_a = flux.headers['col_a']
         for row in flux:
