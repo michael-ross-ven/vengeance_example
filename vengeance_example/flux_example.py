@@ -66,7 +66,9 @@ def main():
     # write_to_excel(flux)
 
     flux_subclass()
+
     # attribute_access_performance()
+    # attribute_access_performance_exper()
 
 
 def instantiate_flux():
@@ -433,9 +435,9 @@ def flux_grouping_methods(flux: flux_cls):
     d_1 = flux.map_rows('col_a', 'col_b')
     d_2 = flux.map_rows_append('col_a', 'col_b')
 
-    k = ('a', 'b')
-    a = d_1[k]          # .map_rows():        only ever stores a single row
-    b = d_2[k]          # .map_rows_append(): a list of rows, effectively, a groupby operation
+    # k = ('a', 'b')
+    a = d_1[('a', 'b')]          # .map_rows():        only ever stores a single row
+    b = d_2[('a', 'b')]          # .map_rows_append(): a list of rows, effectively, a groupby operation
 
     # specify column values to map
     d = flux.map_rows('col_a')
@@ -904,20 +906,15 @@ def attribute_access_performance():
             a = row.values[c_a]
             row.values[c_a] = 'a'
 
-    num_rows = 1_000_000, Ryzen 5800X
-    ν: @flux_example._attribute_access_normal:        843.2 ms
-    ν: @flux_example._attribute_access_namedtuples:   244.0 ms
-    ν: @flux_example._attribute_access_rva:           148.1 ms
-    ν: @flux_example._attribute_access_values:        107.2 ms
-    ν: @flux_example._attribute_access_values_unpack: 67.8 ms
+    Ryzen 7 5800X precision boost OC to 5.0 Ghz
+    num_rows = 1_000_000
+
+    ν: @flux_example._attribute_access_normal:        755.7 ms
+    ν: @flux_example._attribute_access_namedtuples:   232.7 ms
+    ν: @flux_example._attribute_access_rva:           143.9 ms
+    ν: @flux_example._attribute_access_values:        106.5 ms
+    ν: @flux_example._attribute_access_values_unpack: 65.2 ms
     """
-    # from vengeance.classes.flux_row_cls import flux_row_cls
-    # from vengeance.util.text import object_name
-
-    # if object_name(profiler) == 'LineProfiler':
-    #     flux_row_cls.__getattr__ = profiler(flux_row_cls.__getattr__)
-    #     flux_row_cls.__setattr__ = profiler(flux_row_cls.__setattr__)
-
     num_rows = 1_000_000
 
     flux_a = flux_cls(share.random_matrix(num_rows))
@@ -941,10 +938,6 @@ def _attribute_access_normal(flux: flux_cls):
         a = row.col_a
         b = row.col_b
         c = row.col_c
-
-        # row.col_a = 'a'
-        # row.col_b = 'b'
-        # row.col_c = 'c'
 
 
 @print_runtime
@@ -982,6 +975,35 @@ def _attribute_access_values(flux: flux_cls):
 def _attribute_access_values_unpack(flux: flux_cls):
     for row in flux:
         a, b, c = row.values
+
+
+def attribute_access_performance_exper():
+    from line_profiler import LineProfiler
+    from vengeance.classes.flux_row_cls import flux_row_cls
+
+    lprofiler = LineProfiler()
+
+    flux_row_cls.__getattr__ = lprofiler(flux_row_cls.__getattr__)
+    flux_row_cls.__setattr__ = lprofiler(flux_row_cls.__setattr__)
+
+    num_rows = 1_000
+    flux = flux_cls(share.random_matrix(num_rows))
+
+    _attribute_access_exper(flux)
+
+    if lprofiler.functions:
+        lprofiler.print_stats()
+
+
+def _attribute_access_exper(flux: flux_cls):
+    for row in flux:
+        a = row.col_a
+        b = row.col_b
+        c = row.col_c
+
+        row.col_a = 'a'
+        row.col_b = 'b'
+        row.col_c = 'c'
 
 
 if __name__ == '__main__':
