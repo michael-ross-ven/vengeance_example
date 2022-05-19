@@ -6,7 +6,7 @@ flux_cls
     * a lightweight, pure-python wrapper class around list of lists
     * applies named attributes to rows; attribute values are mutable during iteration
     * provides convenience aggregate operations (sort, filter, groupby, etc)
-    * excellent for prototyping and data-wrangling
+    * excellent for extremely fast prototyping and data manipulation
 """
 import sys
 
@@ -141,7 +141,7 @@ def instantiate_flux():
     a = flux.header_names()
     b = flux.matrix[0].values
 
-    # if spaces
+    # if spaces in headers
     m = share.random_matrix(num_rows=10,
                             num_cols=4,
                             len_values=5)
@@ -151,15 +151,15 @@ def instantiate_flux():
     a = flux.header_names()
     b = flux.matrix[0].values
 
-    # __init__ from objects
+    # __init__ from objects (no header row)
     m = [some_cls('a', 'b', 'c') for _ in range(3)]
     flux_b = flux_cls(m)
 
-    # __init__ from slots objects
+    # __init__ from slots objects (no header row)
     m = [some_slots_cls('a', 'b', 'c') for _ in range(3)]
     flux_b = flux_cls(m)
 
-    # __init__ from namedtuples
+    # __init__ from namedtuples (no header row)
     m = [some_namedtuple('a', 'b', 'c') for _ in range(3)]
     flux_b = flux_cls(m)
 
@@ -242,7 +242,7 @@ def iterate_flux_rows(flux: flux_cls):
     row_b = flux.matrix[5]
     row_c = flux.matrix[10]
 
-    # flux.label_row_indices() assigns .row_label property
+    # flux.label_rows() assigns .row_label property
     a = row_a.row_label
     b = row_b.row_label
     c = row_c.row_label
@@ -474,8 +474,8 @@ def flux_grouping_methods(flux: flux_cls):
     flux_b = flux_cls(m)
 
     # .groupby() aliased to .map_rows_nested()
-    # d_1 = flux_b.map_rows_nested('col_a', 'col_b')
-    # d_2 = flux_b.groupby('col_a', 'col_b')
+    d_1 = flux_b.map_rows_nested('col_a', 'col_b')
+    d_2 = flux_b.groupby('col_a', 'col_b')
 
     # compare differences to .map_rows_append()
     d_1 = flux_b.map_rows_nested('col_a', 'col_b')
@@ -707,7 +707,7 @@ def flux_join():
 
     # .join method
     # flux.join(flux_other, {'column_self': 'column_other'})
-    for row_a, row_b in flux_a.join(flux_b, {'id_a': 'id_b'}):
+    for row_a, row_b in flux_a.joined_rows(flux_b, {'id_a': 'id_b'}):
         row_a.cost   = row_b.cost
         row_a.amount = row_b.amount
 
@@ -717,7 +717,7 @@ def flux_join():
     mapped_rows_b = flux_b.map_rows_append('id_b')
 
     # flux.join(any_dict, 'column_self')
-    for row_a, rows_b in flux_a.join(mapped_rows_b, 'id_a'):
+    for row_a, rows_b in flux_a.joined_rows(mapped_rows_b, 'id_a'):
         row_a.cost   = sum([row_b.cost for row_b in rows_b])
         row_a.amount = sum([row_b.amount for row_b in rows_b])
 

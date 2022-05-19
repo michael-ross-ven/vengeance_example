@@ -1,9 +1,9 @@
 
 """
-    > cd "{parent folder of /vengeance_example}"
+    > cd "/{parent folder of vengeance_example}/"
     > python -m vengeance_example.main
 
-    > cd "{/vengeance_example}"
+    > cd "/{vengeance_example}/"
     > python main.py
 """
 try:
@@ -17,16 +17,9 @@ except (ModuleNotFoundError, ImportError):
 
 
 def main():
-    import sys
-    from pathlib import Path
-
-    # module_path = str(Path(__file__).parent.parent.parent)
-    # module_path2 = str(Path(__file__).parent.parent)
-    sys.path.append('..')
-    a = sys.path
-
-    # flux_example.main()
+    flux_example.main()
     # excel_example.main()
+
     pass
 
 
