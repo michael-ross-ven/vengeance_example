@@ -6,11 +6,12 @@ flux_cls
     * a lightweight, pure-python wrapper class around list of lists
     * applies named attributes to rows; attribute values are mutable during iteration
     * provides convenience aggregate operations (sort, filter, groupby, etc)
-    * excellent for extremely fast prototyping and data manipulation
+    * excellent for extremely fast prototyping and data subjugation
 """
 import sys
 
 from collections import namedtuple
+from collections import Counter
 from datetime import datetime
 from pprint import pprint as prettyprint
 from typing import Generator
@@ -50,7 +51,7 @@ def main():
     iterate_primitive_rows(flux)
 
     flux_sort_and_filter_methods(flux)
-    flux_grouping_methods(flux)
+    flux_grouping_and_mapping_methods(flux)
 
     flux_jagged_rows(flux)
     flux_rows_methods(flux)
@@ -401,13 +402,14 @@ def flux_sort_and_filter_methods(flux: flux_cls):
     pass
 
 
-def flux_grouping_methods(flux: flux_cls):
+def flux_grouping_and_mapping_methods(flux: flux_cls):
     """
     two extremely important methods introduced here:
         .map_rows_append()
         .map_rows_nested()
     """
     from vengeance import to_datetime
+    from vengeance.util.iter import transpose
 
     # region {closures}
     def extract_month(row):
@@ -419,38 +421,38 @@ def flux_grouping_methods(flux: flux_cls):
         return dt.year, dt.month
 
     # endregion
-    flux = flux.copy()
+    flux_a = flux.copy()
 
-    flux['col_a'] = ['a'] * flux.num_rows
-    flux['col_b'] = ['b'] * flux.num_rows
+    flux_a['col_a'] = ['a'] * flux_a.num_rows
+    flux_a['col_b'] = ['b'] * flux_a.num_rows
 
-    a = flux.unique('col_a')
-    b = flux.unique('col_a', 'col_b')
+    a = flux_a.unique('col_a')
+    b = flux_a.unique('col_a', 'col_b')
 
     # original ordering of values is maintained: returns ordereddict keys, not an unordered set
-    s = flux.unique.__doc__
+    s = flux_a.unique.__doc__
     t = type(a)                                 # <ordereddict keys>
 
     # .map_rows() and .map_rows_append() have slightly different behavior
-    d_1 = flux.map_rows('col_a', 'col_b')
-    d_2 = flux.map_rows_append('col_a', 'col_b')
+    d_1 = flux_a.map_rows('col_a', 'col_b')
+    d_2 = flux_a.map_rows_append('col_a', 'col_b')
 
     # k = ('a', 'b')
     a = d_1[('a', 'b')]          # .map_rows():        only ever stores a single row
     b = d_2[('a', 'b')]          # .map_rows_append(): a list of rows, effectively, a groupby operation
 
     # specify column values to map
-    d = flux.map_rows('col_a')
-    d = flux.map_rows('col_a', 'col_b', 'col_c')
-    d = flux.map_rows(1, 2)
-    d = flux.map_rows(slice(-3, -1))
+    d = flux_a.map_rows('col_a')
+    d = flux_a.map_rows('col_a', 'col_b', 'col_c')
+    d = flux_a.map_rows(1, 2)
+    d = flux_a.map_rows(slice(-3, -1))
 
     flux['value_a'] = [100.0] * flux.num_rows
 
     d = flux.map_rows_append('col_a', 'col_b')
-    countifs = {k: len(rows) for k, rows in d.items()}
     sumifs   = {k: sum([row.value_a for row in rows])
                                     for k, rows in d.items()}
+    countifs = {k: len(rows) for k, rows in d.items()}
 
     # map dictionary values to types other than flux_row_cls
     d = flux.map_rows_append('col_a', 'col_b', rowtype='dict')
@@ -694,7 +696,7 @@ def flux_join():
 
     flux_a.append_columns('amount')
 
-    # join rows with manual lookups
+    # join rows with explicit lookups
     mapped_rows_b = flux_b.map_rows('id_b')
 
     for row_a in flux_a:
@@ -705,9 +707,9 @@ def flux_join():
         row_a.cost   = row_b.cost
         row_a.amount = row_b.amount
 
-    # .join method
-    # flux.join(flux_other, {'column_self': 'column_other'})
-    for row_a, row_b in flux_a.joined_rows(flux_b, {'id_a': 'id_b'}):
+    # .joined_rows method
+    for row_a, row_b in flux_a.joined_rows(flux_b, names_self='id_a',
+                                                   names_other='id_b'):
         row_a.cost   = row_b.cost
         row_a.amount = row_b.amount
 
@@ -716,7 +718,7 @@ def flux_join():
 
     mapped_rows_b = flux_b.map_rows_append('id_b')
 
-    # flux.join(any_dict, 'column_self')
+    # flux.joined_rows(any_dict, 'column_self')
     for row_a, rows_b in flux_a.joined_rows(mapped_rows_b, 'id_a'):
         row_a.cost   = sum([row_b.cost for row_b in rows_b])
         row_a.amount = sum([row_b.amount for row_b in rows_b])
