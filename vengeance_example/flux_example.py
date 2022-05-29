@@ -32,7 +32,6 @@ try:
 except (ModuleNotFoundError, ImportError):
     from . import share
 
-python_version = sys.version_info
 profiler = share.resolve_profiler_function()
 
 
@@ -297,6 +296,11 @@ def iterate_flux_rows(flux: flux_cls):
     # row offset comparisions
     for row_1, row_2 in zip(flux.matrix[1:], flux.matrix[2:]):
         if row_1.col_a == row_2.col_b:
+            pass
+
+    # compare rows offset by 2
+    for row_1, row_3 in zip(flux.matrix[1::2], flux.matrix[3::2]):
+        if row_1.col_a == row_3.col_b:
             pass
 
 
@@ -643,8 +647,8 @@ def flux_column_values(flux: flux_cls):
     flux['append_d'] = ['append'] * flux.num_rows
 
     # insert a new column
-    flux[(0, 'insert_a')] = [['insert'] for _ in range(flux.num_rows)]
-    flux[(0, 'enum')] = flux.indices()
+    flux[(0, 'insert_a')] = [['inserted value {}'.format(i)] for i in range(1, flux.num_rows + 1)]
+    flux[(0, 'i')]        = flux.range()
 
     # shorthand to apply a single value to all rows in column
     flux['col_z'] = ['blah'] * flux.num_rows
@@ -877,10 +881,7 @@ class flux_custom_cls(flux_cls):
         self.num_unique_names = len(self.unique('name'))
 
     def _filter_apples_sold(self):
-        def by_apples_sold(_row_):
-            return _row_.apples_sold >= 2
-
-        self.filter(by_apples_sold)
+        self.filter(lambda row: row.apples_sold >= 2)
 
     def validate(self):
         error_indices = []
