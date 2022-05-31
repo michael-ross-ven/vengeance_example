@@ -1,13 +1,4 @@
 
-"""
-flux_cls
-    * similar idea behind a pandas DataFrame, but is more closely aligned with Python's design philosophy
-    * when you're willing to trade for a little bit of speed for a lot simplicity
-    * a lightweight, pure-python wrapper class around list of lists
-    * applies named attributes to rows; attribute values are mutable during iteration
-    * provides convenience aggregate operations (sort, filter, groupby, etc)
-    * excellent for extremely fast prototyping and data subjugation
-"""
 import sys
 
 from collections import namedtuple
@@ -99,13 +90,20 @@ def instantiate_flux():
             self.col_c = v_c
     # endregion
 
+    # instantiating with no arguments is fine
+    flux = flux_cls()
+
     # matrix organized like csv data, column names are provided in first row
     m = share.random_matrix(num_rows=20,
                             num_cols=10,
                             len_values=5)
     flux = flux_cls(m)
 
-    a = dir(flux_cls)
+    a = [p for p in dir(flux_cls)
+           if not p.startswith('__')
+           if not p.startswith('_flux_cls')]
+    b = flux_cls.__doc__
+
     rp = repr(flux)
 
     a = flux.headers
@@ -124,24 +122,30 @@ def instantiate_flux():
     c = flux._preview_as_array
 
     flux.preview_indices = slice(-5, None)       # preview last 5 rows
-    b = flux._preview_as_array
+    a = flux._preview_as_array
     flux.preview_indices = [3, 5, 6]             # preview rows 3, 5, 6
-    c = flux._preview_as_array
+    b = flux._preview_as_array
+
+    flux.label_rows(start=1)
+    a = flux._preview_as_array
+
+    flux.clear_row_labels()
 
     flux_b = flux.copy()
     # flux_b = flux.copy(deep=True)
 
-    # if duplicate header values
     m = share.random_matrix(num_rows=10,
                             num_cols=4,
                             len_values=5)
+    # if duplicate values in header row
     m[0] = ['col_a', 'col_a', 'col_a', 'col_a']
     flux = flux_cls(m)
 
+    # values in flux.headers will differ to those stored in the first row
     a = flux.header_names()
     b = flux.matrix[0].values
 
-    # if spaces in headers
+    # if spaces in values in header row
     m = share.random_matrix(num_rows=10,
                             num_cols=4,
                             len_values=5)
@@ -149,7 +153,6 @@ def instantiate_flux():
     flux = flux_cls(m)
 
     a = flux.header_names()
-    b = flux.matrix[0].values
 
     # __init__ from objects (no header row)
     m = [some_cls('a', 'b', 'c') for _ in range(3)]
@@ -169,48 +172,51 @@ def instantiate_flux():
 def invalid_instantiations():
     """
     1) matrix must have at least 2 dimensions
-    2) certain reserved column names cannot appear as
-       dynamic column names in matrix, eg
+    2) certain reserved column names cannot appear as dynamic column names in matrix, eg
         headers
         values
         row_label
-        __bool__
-        __class__
-        ...
-        __str__
-        __subclasshook__
-        __weakref__
-        _flux_row_cls__raise_attribute_error
-        _preview_as_array
-        _preview_as_tuple
-        dict
-        header_names
-        is_empty
-        is_header_row
-        is_jagged
-        join_values
-        namedrow
-        namedtuple
         reserved_names
+        namedtuple
+        namedrow
+        join_values
+        is_jagged
+        is_header_row
+        is_empty
+        header_names
+        dict
+        ...
+        __getitem__
+        __getattribute__
+        __getattr__
+        __ge__
+        __format__
+        __eq__
+        __doc__
+        __dir__
+        __dict__
+        __delattr__
+        __class__
+        __bool__
     """
     from vengeance.classes.flux_row_cls import flux_row_cls
 
-    # no arguments is fine
+    # instantiating with no arguments is fine
     flux = flux_cls()
 
     try:
         '''
-        a one-dimensional list is not fine, unknown if was meant to be a:
+        instantiating with one-dimensional list will cause error, unknown if was meant to be a:
             row:    [['col_a', 'a']] 
         or 
             column: [['col_a'], ['a']]
         '''
         flux = flux_cls(['col_a', 'a'])
-    except IndexError as e:
+    except (TypeError, IndexError) as e:
         print(e)
 
     reserved = flux_row_cls.reserved_names()
-    print('reserved header names: \n{}'.format('\n'.join(reserved)))
+    print('reserved header names: \n{}'.format('\n\t'.join(reserved)))
 
     try:
         flux = flux_cls([['headers',
@@ -219,7 +225,7 @@ def invalid_instantiations():
                           'is_jagged',
                           '__dict__',
                           '__len__']])
-    except NameError as e:
+    except (ValueError, NameError) as e:
         print(e)
 
     print()
